@@ -1,18 +1,48 @@
 import '@/styles/globals.css';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import type { Metadata } from 'next';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jetbrains-mono' });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+});
 
-export const metadata = {
-  title: 'AI Truck & Wagon Detection',
-  description: 'Enterprise AI Platform for Logistics',
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Vantage AI — Industrial Vehicle Detection Platform',
+    template: '%s · Vantage AI',
+  },
+  description:
+    'Next Generation AI-powered Truck & Wagon Detection Platform for logistics, railways, and manufacturing facilities.',
+  keywords: [
+    'AI detection',
+    'truck detection',
+    'wagon detection',
+    'industrial vision',
+    'computer vision',
+    'logistics AI',
+  ],
+  authors: [{ name: 'Vantage AI' }],
+  robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-gray-50 text-slate-900`}>
+      <body
+        className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground`}
+      >
         {children}
       </body>
     </html>

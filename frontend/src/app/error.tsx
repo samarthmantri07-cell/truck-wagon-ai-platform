@@ -1,20 +1,39 @@
-"use client"
+'use client';
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/button';
 
-export default function Error({ error, reset }: { error: Error & { digest?: string }, reset: () => void }) {
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
   useEffect(() => {
-    console.error(error);
+    console.error('[Vantage AI Error]', error);
   }, [error]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-center px-4">
-      <h1 className="text-8xl font-bold font-mono text-destructive/20">500</h1>
-      <h2 className="mt-4 text-2xl font-semibold">Something went wrong</h2>
-      <p className="mt-2 text-slate-500 max-w-md">An unexpected error occurred in the application.</p>
-      <div className="mt-8 flex gap-4">
-        <Button onClick={() => reset()}>Try again</Button>
-        <Button variant="outline" onClick={() => window.location.href = '/dashboard'}>Return to Dashboard</Button>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-center px-6">
+      <div className="text-[120px] font-semibold font-mono text-error/10 leading-none select-none">
+        500
+      </div>
+      <h1 className="mt-4 text-display-sm font-semibold">Something went wrong</h1>
+      <p className="mt-3 text-body-md text-muted-foreground max-w-sm">
+        An unexpected error occurred. The engineering team has been notified.
+      </p>
+      <div className="mt-10 flex gap-3">
+        <button
+          onClick={reset}
+          className="px-6 py-3 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-all hover:-translate-y-0.5"
+        >
+          Try again
+        </button>
+        <a
+          href="/dashboard"
+          className="px-6 py-3 rounded-xl border border-border text-sm font-medium hover:bg-muted transition-all"
+        >
+          Return to Console
+        </a>
       </div>
     </div>
   );
