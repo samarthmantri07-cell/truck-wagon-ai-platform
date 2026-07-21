@@ -3,14 +3,18 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import { cn } from '@/lib/utils';
+import { useUsers, useCreateUser, useDeleteUser, useUpdateUser } from '@/hooks/useUsers';
+import { useAuthStore } from '@/store/useAuthStore';
+import { Trash2, Edit2, ShieldAlert } from 'lucide-react';
 
-type Tab = 'camera' | 'ai' | 'notifications' | 'system';
+type Tab = 'camera' | 'ai' | 'notifications' | 'system' | 'users';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'camera',        label: 'Camera' },
   { id: 'ai',            label: 'AI Model' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'system',        label: 'System' },
+  { id: 'users',         label: 'Users & Roles' },
 ];
 
 function Row({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
@@ -44,7 +48,48 @@ function Toggle({ defaultChecked = false }: { defaultChecked?: boolean }) {
 }
 
 export default function Settings() {
+  const { user: currentUser } = useAuthStore();
   const [activeTab, setActiveTab] = useState<Tab>('camera');
+
+  // Users hooks
+  const { data: users, isLoading: usersLoading } = useUsers();
+  const { mutate: createUser, isPending: isCreating } = useCreateUser();
+  const { mutate: deleteUser } = useDeleteUser();
+  const { mutate: updateUser } = useUpdateUser();
+
+  const [newUsername, setNewUsername] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState('operator');
+  const [userError, setUserError] = useState('');
+
+  // Filter tabs if not admin
+  const visibleTabs = currentUser?.role === 'admin' ? TABS : TABS.filter(t => t.id !== 'users');
+  
+  if (currentUser?.role !== 'admin' && activeTab === 'users') {
+    setActiveTab('camera');
+  }
+
+  const handleCreateUser = () => {
+    if (!newUsername || !newPassword) {
+      setUserError('Username and password are required');
+      return;
+    }
+    setUserError('');
+    createUser({ username: newUsername, password: newPassword, role: newRole }, {
+      onSuccess: () => {
+        setNewUsername('');
+        setNewPassword('');
+        setNewRole('operator');
+      },
+      onError: (err: any) => {
+        setUserError(err.response?.data?.message || 'Failed to create user');
+      }
+    });
+  };
+
+  const handleRoleChange = (id: string, role: string) => {
+    updateUser({ id, data: { role } });
+  };
 
   return (
     <DashboardLayout title="Settings">
@@ -56,13 +101,13 @@ export default function Settings() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-8 border-b border-border">
-        {TABS.map(t => (
+      <div className="flex gap-1 mb-8 border-b border-border overflow-x-auto no-scrollbar">
+        {visibleTabs.map(t => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={cn(
-              'px-4 py-2.5 text-sm font-medium transition-colors relative',
+              'px-4 py-2.5 text-sm font-medium transition-colors relative whitespace-nowrap',
               activeTab === t.id
                 ? 'text-foreground'
                 : 'text-muted-foreground hover:text-foreground'
@@ -125,9 +170,9 @@ export default function Settings() {
             </Row>
             <Row label="Model Version" desc="Active YOLOv8 model weights.">
               <select className="h-9 pl-3 pr-8 rounded-lg border border-border bg-card text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring">
+                <option>YOLO11 — v4.0.0</option>
                 <option>YOLOv8m — v3.2.1</option>
                 <option>YOLOv8n — v3.2.0 (fast)</option>
-                <option>YOLOv8l — v3.2.1 (accurate)</option>
               </select>
             </Row>
             <Row label="Enable OCR" desc="Extract vehicle plate numbers and wagon IDs.">
@@ -189,11 +234,105 @@ export default function Settings() {
           </div>
         )}
 
-        <div className="mt-6 flex justify-end">
-          <button className="px-6 py-2.5 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-all hover:-translate-y-0.5 active:translate-y-0">
-            Save Changes
-          </button>
-        </div>
+        {activeTab === 'users' && currentUser?.role === 'admin' && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-border bg-card px-6 py-5">
+              <h3 className="text-sm font-semibold mb-4">Create New User</h3>
+              {userError && <div className="text-xs text-red-500 mb-3 bg-red-50 p-2 rounded">{userError}</div>}
+              <div className="flex items-end gap-3">
+                <div className="space-y-1.5 flex-1">
+                  <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Employee ID</label>
+                  <input
+                    value={newUsername}
+                    onChange={(e) => setNewUsername(e.target.value)}
+                    type="text"
+                    placeholder="emp123"
+                    className="w-full h-9 px-3 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Password</label>
+                  <input
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    type="password"
+                    placeholder="••••••••"
+                    className="w-full h-9 px-3 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5 flex-1">
+                  <label className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Role</label>
+                  <select 
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    className="w-full h-9 px-3 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    <option value="operator">Operator</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <button 
+                  onClick={handleCreateUser}
+                  disabled={isCreating}
+                  className="h-9 px-4 rounded-lg bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-colors disabled:opacity-50"
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              <div className="px-6 py-4 border-b border-border">
+                <h3 className="text-sm font-semibold">User Directory</h3>
+              </div>
+              <div className="divide-y divide-border">
+                {usersLoading ? (
+                  <div className="p-6 text-sm text-center text-muted-foreground">Loading users...</div>
+                ) : users?.map((u: any) => (
+                  <div key={u.id} className="px-6 py-4 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold flex items-center gap-2">
+                        {u.username}
+                        {u.role === 'admin' && <ShieldAlert className="w-3.5 h-3.5 text-blue-500" />}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5 font-mono">
+                        ID: {u.id}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <select 
+                        value={u.role}
+                        onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                        disabled={u.id === currentUser.id}
+                        className="h-8 px-2 rounded border border-border bg-muted/40 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                      >
+                        <option value="operator">Operator</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <button 
+                        onClick={() => deleteUser(u.id)}
+                        disabled={u.id === currentUser.id}
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-error/10 hover:text-error transition-colors disabled:opacity-30"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab !== 'users' && (
+          <div className="mt-6 flex justify-end">
+            <button className="px-6 py-2.5 rounded-xl bg-foreground text-background text-sm font-medium hover:bg-foreground/90 transition-all hover:-translate-y-0.5 active:translate-y-0">
+              Save Changes
+            </button>
+          </div>
+        )}
       </motion.div>
     </DashboardLayout>
   );

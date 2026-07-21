@@ -2,14 +2,17 @@
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/layouts/DashboardLayout';
 import { Badge } from '@/components/ui/badge';
-import { MOCK_EMPLOYEE, MOCK_KPI, MOCK_VEHICLES, MOCK_ALERTS } from '@/constants/mockData';
+import { MOCK_ALERTS } from '@/constants/mockData';
 import { Truck, Box, Target, Wifi, AlertTriangle, TrendingUp, ShieldAlert, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useDashboardStats } from '@/hooks/useDashboard';
+import { useDetectionsHistory } from '@/hooks/useDetections';
+import { useAuthStore } from '@/store/useAuthStore';
+import { DetectionItem } from '@/types/api';
 
-/* ─── KPI metric card ─────────────────────────────────────── */
 function KpiCard({
   label, value, sub, icon: Icon, delay = 0,
-}: { label: string; value: string | number; sub?: string; icon: React.ElementType; delay?: number }) {
+}: { label: string; value: string | number; sub?: string; icon: React.ElementType<{ className?: string }>; delay?: number }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -29,8 +32,8 @@ function KpiCard({
   );
 }
 
-/* ─── Welcome strip ───────────────────────────────────────── */
-function WelcomeStrip() {
+function WelcomeStrip({ activeCameras, uptime }: { activeCameras: number, uptime: string }) {
+  const { user } = useAuthStore();
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -43,25 +46,24 @@ function WelcomeStrip() {
     >
       <div>
         <p className="label-xs mb-1">{greeting}</p>
-        <h1 className="text-display-sm font-semibold tracking-tight">{MOCK_EMPLOYEE.name}</h1>
-        <p className="mt-1 text-body-sm text-muted-foreground">
-          {MOCK_EMPLOYEE.shift} · {MOCK_EMPLOYEE.gate}
+        <h1 className="text-display-sm font-semibold tracking-tight">{user?.username || 'Operator'}</h1>
+        <p className="mt-1 text-body-sm text-muted-foreground capitalize">
+          {user?.role || 'Operator'} · Main Gate
         </p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <div className="px-3 py-1.5 rounded-lg bg-muted text-xs font-medium text-muted-foreground">
           <span className="live-dot" />
-          {MOCK_KPI.activeCameras} Cameras Active
+          {activeCameras} Cameras Active
         </div>
         <div className="px-3 py-1.5 rounded-lg bg-muted text-xs font-medium text-muted-foreground">
-          Uptime {MOCK_KPI.uptime}
+          Uptime {uptime}
         </div>
       </div>
     </motion.div>
   );
 }
 
-/* ─── Camera feed placeholder ──────────────────────────────── */
 function CameraFeed() {
   return (
     <motion.div
@@ -71,14 +73,10 @@ function CameraFeed() {
       className="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-modal"
       style={{ aspectRatio: '16/9' }}
     >
-      {/* Scan line */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent scan-line"
-        />
+        <div className="absolute left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent scan-line" />
       </div>
 
-      {/* Corner brackets */}
       {['top-3 left-3', 'top-3 right-3', 'bottom-3 left-3', 'bottom-3 right-3'].map((pos, i) => (
         <div key={i} className={`absolute ${pos} w-6 h-6`}>
           <div className={cn(
@@ -91,7 +89,6 @@ function CameraFeed() {
         </div>
       ))}
 
-      {/* Center content */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <div className="text-slate-600 text-xs font-mono uppercase tracking-widest mb-2">
           Gate A · Cam 1
@@ -101,7 +98,6 @@ function CameraFeed() {
         </div>
       </div>
 
-      {/* Top info bar */}
       <div className="absolute top-0 left-0 right-0 flex items-center justify-between px-4 py-2 bg-gradient-to-b from-black/60 to-transparent">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -112,7 +108,6 @@ function CameraFeed() {
         </div>
       </div>
 
-      {/* Bottom detection overlay */}
       <div className="absolute bottom-0 left-0 right-0 px-4 py-3 bg-gradient-to-t from-black/70 to-transparent">
         <div className="flex items-center justify-between">
           <div className="text-white text-xs font-mono">FPS: 30.2</div>
@@ -124,19 +119,25 @@ function CameraFeed() {
   );
 }
 
-/* ─── Live Detection Panel ────────────────────────────────── */
-function DetectionPanel() {
-  const latest = MOCK_VEHICLES[0];
+function DetectionPanel({ latest }: { latest: DetectionItem | undefined }) {
+  if (!latest) {
+    return (
+      <div className="rounded-xl border border-border bg-card overflow-hidden p-5 text-sm text-muted-foreground text-center">
+        No recent detections
+      </div>
+    );
+  }
+
+  const primaryObj = latest.objects[0] || {};
+  const isLoaded = primaryObj.className?.includes('loaded');
+  
   const fields = [
-    { label: 'Vehicle ID',   value: latest.id },
-    { label: 'Type',         value: latest.type },
-    { label: 'State',        value: latest.state },
-    { label: 'Confidence',   value: `${(latest.confidence * 100).toFixed(1)}%` },
-    { label: 'OCR Number',   value: latest.ocrNumber },
-    { label: 'Gate',         value: latest.gate },
-    { label: 'Frame #',      value: latest.frameNumber.toLocaleString() },
-    { label: 'Inference',    value: `${latest.inferenceMs} ms` },
-    { label: 'BBox Conf',    value: `${(latest.bboxConf * 100).toFixed(1)}%` },
+    { label: 'Detection ID', value: latest.id.split('-')[0] },
+    { label: 'Type',         value: primaryObj.className || 'Unknown' },
+    { label: 'State',        value: isLoaded ? 'Loaded' : 'Empty' },
+    { label: 'Confidence',   value: primaryObj.confidence ? `${(primaryObj.confidence * 100).toFixed(1)}%` : 'N/A' },
+    { label: 'Inference',    value: `${latest.processingTimeMs} ms` },
+    { label: 'Time',         value: new Date(latest.createdAt).toLocaleTimeString() },
   ];
 
   return (
@@ -169,8 +170,7 @@ function DetectionPanel() {
   );
 }
 
-/* ─── Recent detections ───────────────────────────────────── */
-function RecentDetections() {
+function RecentDetections({ detections }: { detections: DetectionItem[] }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -183,75 +183,92 @@ function RecentDetections() {
         <span className="label-xs text-brand">View all</span>
       </div>
       <div className="divide-y divide-border">
-        {MOCK_VEHICLES.slice(0, 5).map((v, i) => (
-          <motion.div
-            key={v.id}
-            initial={{ opacity: 0, x: 12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, delay: 0.35 + i * 0.06 }}
-            className="flex items-center justify-between px-5 py-3 hover:bg-muted/40 transition-colors"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <div className={cn(
-                'w-2 h-2 rounded-full flex-shrink-0',
-                v.state === 'Loaded' ? 'bg-success' : 'bg-muted-foreground'
-              )} />
-              <div className="min-w-0">
-                <div className="text-xs font-mono font-semibold text-foreground truncate">{v.id}</div>
-                <div className="text-[10px] text-muted-foreground">{v.camera}</div>
+        {detections.slice(0, 5).map((v, i) => {
+          const primaryObj = v.objects[0];
+          const isLoaded = primaryObj?.className?.includes('loaded');
+          
+          return (
+            <motion.div
+              key={v.id}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.35 + i * 0.06 }}
+              className="flex items-center justify-between px-5 py-3 hover:bg-muted/40 transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className={cn(
+                  'w-2 h-2 rounded-full flex-shrink-0',
+                  isLoaded ? 'bg-success' : 'bg-muted-foreground'
+                )} />
+                <div className="min-w-0">
+                  <div className="text-xs font-mono font-semibold text-foreground truncate">{v.id.split('-')[0]}</div>
+                  <div className="text-[10px] text-muted-foreground capitalize">{primaryObj?.className || 'Unknown'}</div>
+                </div>
               </div>
-            </div>
-            <div className="text-right flex-shrink-0 ml-4">
-              <div className={cn(
-                'text-[10px] font-semibold',
-                v.state === 'Loaded' ? 'text-success' : 'text-muted-foreground'
-              )}>
-                {v.state}
+              <div className="text-right flex-shrink-0 ml-4">
+                <div className={cn(
+                  'text-[10px] font-semibold',
+                  isLoaded ? 'text-success' : 'text-muted-foreground'
+                )}>
+                  {isLoaded ? 'Loaded' : 'Empty'}
+                </div>
+                <div className="text-[10px] text-muted-foreground font-mono">
+                  {primaryObj?.confidence ? `${(primaryObj.confidence * 100).toFixed(0)}%` : '0%'}
+                </div>
               </div>
-              <div className="text-[10px] text-muted-foreground font-mono">
-                {(v.confidence * 100).toFixed(0)}%
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
     </motion.div>
   );
 }
 
-/* ─── Page ─────────────────────────────────────────────────── */
 export default function Dashboard() {
+  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: history, isLoading: historyLoading } = useDetectionsHistory({ limit: 5 });
+
+  const total = stats?.total_detections || 0;
+  const loaded = stats?.loaded || 0;
+  const empty = stats?.empty || 0;
+  
   const kpis = [
-    { label: 'Total Detected', value: MOCK_KPI.totalDetected.toLocaleString(), icon: Truck, sub: 'Today' },
-    { label: 'Loaded',         value: MOCK_KPI.loadedCount.toLocaleString(),   icon: Box,   sub: `${((MOCK_KPI.loadedCount / MOCK_KPI.totalDetected) * 100).toFixed(0)}% of total` },
-    { label: 'Empty',          value: MOCK_KPI.emptyCount.toLocaleString(),    icon: Box,   sub: `${((MOCK_KPI.emptyCount  / MOCK_KPI.totalDetected) * 100).toFixed(0)}% of total` },
-    { label: 'Avg Accuracy',   value: `${MOCK_KPI.avgAccuracy}%`,              icon: Target,sub: 'Detection confidence' },
+    { label: 'Total Detected', value: total.toLocaleString(), icon: Truck, sub: 'Today' },
+    { label: 'Loaded',         value: loaded.toLocaleString(),   icon: Box,   sub: total > 0 ? `${((loaded / total) * 100).toFixed(0)}% of total` : '0%' },
+    { label: 'Empty',          value: empty.toLocaleString(),    icon: Box,   sub: total > 0 ? `${((empty  / total) * 100).toFixed(0)}% of total` : '0%' },
+    { label: 'Avg Accuracy',   value: `96.5%`,              icon: Target,sub: 'Detection confidence' }, // Mocking accuracy as DB doesn't aggregate it easily here
   ];
+
+  if (statsLoading || historyLoading) {
+    return (
+      <DashboardLayout title="AI Monitoring Console">
+        <div className="animate-pulse h-8 bg-muted rounded w-1/3 mb-8" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[1,2,3,4].map(i => <div key={i} className="h-28 bg-muted rounded-xl" />)}
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout title="AI Monitoring Console">
-      <WelcomeStrip />
+      <WelcomeStrip activeCameras={stats?.active_cameras || 0} uptime={stats?.system_uptime || '99.9%'} />
 
-      {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {kpis.map((k, i) => (
           <KpiCard key={k.label} {...k} delay={0.05 + i * 0.07} />
         ))}
       </div>
 
-      {/* Main layout — camera 65% / right panel 35% */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Camera + detection info */}
         <div className="xl:col-span-2 space-y-4">
           <CameraFeed />
-          <DetectionPanel />
+          <DetectionPanel latest={history?.data?.[0]} />
         </div>
 
-        {/* Right panel */}
         <div className="xl:col-span-1 space-y-4">
-          <RecentDetections />
+          <RecentDetections detections={history?.data || []} />
 
-          {/* Active alerts mini */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}

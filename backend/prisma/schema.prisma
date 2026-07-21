@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String     @id @default(uuid())
+  username  String     @unique
+  password  String
+  role      String     @default("operator")
+  createdAt DateTime   @default(now())
+  AuditLogs AuditLog[]
+}
+
+model Upload {
+  id            String         @id @default(uuid())
+  filePath      String
+  status        String         @default("pending")
+  createdAt     DateTime       @default(now())
+  Detection     Detection[]
+  VideoMetadata VideoMetadata?
+}
+
+model Detection {
+  id               String              @id @default(uuid())
+  uploadId         String
+  processingTimeMs Int
+  success          Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  upload           Upload              @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  objects          DetectionObject[]
+  history          PredictionHistory[]
+}
+
+model DetectionObject {
+  id          String    @id @default(uuid())
+  detectionId String
+  className   String
+  confidence  Float
+  x1          Float
+  y1          Float
+  x2          Float
+  y2          Float
+  detection   Detection @relation(fields: [detectionId], references: [id], onDelete: Cascade)
+}
+
+model PredictionHistory {
+  id          String    @id @default(uuid())
+  detectionId String
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  detection   Detection @relation(fields: [detectionId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id               String   @id @default(uuid())
+  reportId         String   @unique
+  date             DateTime
+  vehicleType      String
+  inspectionStatus String
+  confidence       Float    @default(0.0)
+  gateNumber       String   @default("Gate 1")
+  damage           Boolean  @default(false)
+  emergency        Boolean  @default(false)
+  filePath         String
+  createdAt        DateTime @default(now())
+}
+
+model SystemSetting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VideoMetadata {
+  id                 String   @id @default(uuid())
+  uploadId           String   @unique
+  frameCount         Int
+  fps                Float
+  processingTimeMs   Int
+  avgConfidence      Float
+  detectionSummary   Json
+  upload             Upload   @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+}

@@ -17,385 +17,7 @@ import {
 import { MOCK_CHART_DATA, MOCK_KPI } from '@/constants/mockData';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
-/* ═══════════════════════════════════════════════════════════════
-   LAYER 1 — AURORA CANVAS
-   Large, softly flowing light bands. HSL blue–indigo–cream.
-   Never pulses. Never blinks. Flows continuously at 60 FPS.
-   ══════════════════════════════════════════════════════════════ */
-function AuroraLayer({ mx, my }: { mx: number; my: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const raf = useRef<number>(0);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let W = 0, H = 0;
-    const resize = () => { W = canvas.width = canvas.offsetWidth; H = canvas.height = canvas.offsetHeight; };
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-
-    /* Aurora bands — very large, very soft */
-    const bands = [
-      { cx: 0.20, cy: 0.35, rx: 0.70, ry: 0.40, spd: 0.00010, ph: 0.00, h: 215, s: 80, l: 70, a: 0.18 },
-      { cx: 0.75, cy: 0.20, rx: 0.60, ry: 0.50, spd: 0.00008, ph: 1.57, h: 225, s: 70, l: 75, a: 0.14 },
-      { cx: 0.50, cy: 0.80, rx: 0.80, ry: 0.35, spd: 0.00012, ph: 3.14, h: 200, s: 65, l: 80, a: 0.12 },
-      { cx: 0.85, cy: 0.60, rx: 0.50, ry: 0.45, spd: 0.00007, ph: 4.71, h: 235, s: 60, l: 78, a: 0.10 },
-      { cx: 0.10, cy: 0.70, rx: 0.55, ry: 0.40, spd: 0.00009, ph: 2.35, h: 210, s: 75, l: 72, a: 0.13 },
-    ];
-
-    const draw = (ts: number) => {
-      ctx.clearRect(0, 0, W, H);
-      const dx = (mx - 0.5) * 0.06;
-      const dy = (my - 0.5) * 0.04;
-
-      bands.forEach(b => {
-        const t = ts * b.spd + b.ph;
-        const cx = (b.cx + Math.sin(t)        * 0.15 + dx) * W;
-        const cy = (b.cy + Math.cos(t * 0.72) * 0.12 + dy) * H;
-        const rx = b.rx * W;
-        const ry = b.ry * H;
-        const angle = Math.sin(t * 0.4) * 0.4;
-
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
-        g.addColorStop(0,   `hsla(${b.h},${b.s}%,${b.l}%,${b.a})`);
-        g.addColorStop(0.4, `hsla(${b.h+8},${b.s-10}%,${b.l+6}%,${b.a * 0.5})`);
-        g.addColorStop(1,   `hsla(${b.h},${b.s}%,${b.l}%,0)`);
-        ctx.fillStyle = g;
-        ctx.scale(1, ry / rx);
-        ctx.beginPath();
-        ctx.arc(0, 0, rx, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      });
-
-      raf.current = requestAnimationFrame(draw);
-    };
-
-    raf.current = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(raf.current); ro.disconnect(); };
-  }, [mx, my]);
-
-  return (
-    <canvas
-      ref={ref}
-      className="absolute inset-0 w-full h-full"
-      style={{ mixBlendMode: 'normal', willChange: 'transform' }}
-    />
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LAYER 2 — FLOW FIELD PARTICLES
-   ~180 tiny particles following a vector field.
-   Lines connect nearby particles. Barely visible, deeply alive.
-   ══════════════════════════════════════════════════════════════ */
-interface Particle {
-  x: number; y: number;
-  vx: number; vy: number;
-  life: number; maxLife: number;
-}
-
-function FlowFieldLayer({ mx, my, scrollZ }: { mx: number; my: number; scrollZ: number }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const raf = useRef<number>(0);
-  const particles = useRef<Particle[]>([]);
-
-  useEffect(() => {
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let W = 0, H = 0;
-
-    const resize = () => {
-      W = canvas.width  = canvas.offsetWidth;
-      H = canvas.height = canvas.offsetHeight;
-      particles.current = [];
-      for (let i = 0; i < 180; i++) spawnParticle(W, H);
-    };
-
-    const spawnParticle = (w: number, h: number): void => {
-      particles.current.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: 0, vy: 0,
-        life: Math.random() * 200,
-        maxLife: 180 + Math.random() * 120,
-      });
-    };
-
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-
-    /* Vector field — smooth pseudo-Perlin using trig */
-    const field = (x: number, y: number, t: number) => {
-      const nx = x * 0.0025, ny = y * 0.0025;
-      const angle =
-        Math.sin(nx + t * 0.18) * Math.cos(ny * 0.8) * Math.PI * 2 +
-        Math.sin(ny * 0.6 + t * 0.12) * 0.8;
-      return { ax: Math.cos(angle) * 0.28, ay: Math.sin(angle) * 0.28 };
-    };
-
-    let t = 0;
-    const CONNECT_DIST = 90;
-    const SPEED = 1 + scrollZ * 0.8;  // faster on scroll
-
-    const draw = () => {
-      t += 0.012 * SPEED;
-      ctx.clearRect(0, 0, W, H);
-
-      /* Mouse attractor — very gentle */
-      const mwx = mx * W;
-      const mwy = my * H;
-
-      particles.current.forEach((p, i) => {
-        const { ax, ay } = field(p.x, p.y, t);
-        /* Gentle mouse gravity */
-        const mdx = mwx - p.x, mdy = mwy - p.y;
-        const md  = Math.sqrt(mdx * mdx + mdy * mdy) + 1;
-        const mf  = Math.min(60 / md, 0.12);
-
-        p.vx = p.vx * 0.94 + ax * 0.06 + (mdx / md) * mf * 0.04;
-        p.vy = p.vy * 0.94 + ay * 0.06 + (mdy / md) * mf * 0.04;
-        p.x += p.vx;
-        p.y += p.vy;
-        p.life++;
-
-        /* Respawn at edge or end of life */
-        if (p.life > p.maxLife || p.x < -10 || p.x > W + 10 || p.y < -10 || p.y > H + 10) {
-          particles.current[i] = {
-            x: Math.random() * W, y: Math.random() * H,
-            vx: 0, vy: 0, life: 0, maxLife: 180 + Math.random() * 120,
-          };
-          return;
-        }
-
-        /* Opacity fades in/out with life */
-        const lifeRatio = p.life / p.maxLife;
-        const alpha = Math.sin(lifeRatio * Math.PI) * 0.22;
-
-        /* Dot */
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 1.1, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(59,118,240,${alpha * 0.7})`;
-        ctx.fill();
-
-        /* Connect nearby particles */
-        for (let j = i + 1; j < particles.current.length; j++) {
-          const q = particles.current[j];
-          const dx = p.x - q.x, dy = p.y - q.y;
-          const d  = Math.sqrt(dx * dx + dy * dy);
-          if (d < CONNECT_DIST) {
-            const lineA = alpha * (1 - d / CONNECT_DIST) * 0.35;
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(q.x, q.y);
-            ctx.strokeStyle = `rgba(80,130,250,${lineA})`;
-            ctx.lineWidth = 0.5;
-            ctx.stroke();
-          }
-        }
-      });
-
-      raf.current = requestAnimationFrame(draw);
-    };
-
-    raf.current = requestAnimationFrame(draw);
-    return () => { cancelAnimationFrame(raf.current); ro.disconnect(); };
-  }, [mx, my, scrollZ]);
-
-  return (
-    <canvas
-      ref={ref}
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      style={{ willChange: 'transform' }}
-    />
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LAYER 3 — GLASS BLOBS
-   7 large blurred shapes drifting independently.
-   CSS animations for pure GPU compositing. Zero JS cost.
-   ══════════════════════════════════════════════════════════════ */
-function GlassBlobLayer({ mx, my }: { mx: number; my: number }) {
-  const blobs = [
-    { w: 700, h: 500, top: -10,  left: -5,  dur: 22, delay: 0,   hue: 215, sat: 80, lit: 72, a: 0.12, rotate: 12 },
-    { w: 600, h: 480, top: 20,   left: 55,  dur: 28, delay: -8,  hue: 200, sat: 65, lit: 78, a: 0.10, rotate: -8 },
-    { w: 750, h: 400, top: 50,   left: -10, dur: 34, delay: -14, hue: 225, sat: 70, lit: 75, a: 0.09, rotate: 20 },
-    { w: 500, h: 600, top: -20,  left: 70,  dur: 26, delay: -5,  hue: 210, sat: 75, lit: 70, a: 0.11, rotate: -15 },
-    { w: 650, h: 450, top: 60,   left: 30,  dur: 32, delay: -18, hue: 230, sat: 60, lit: 80, a: 0.08, rotate: 6  },
-    { w: 550, h: 520, top: -5,   left: 45,  dur: 20, delay: -10, hue: 205, sat: 72, lit: 76, a: 0.09, rotate: -22 },
-    { w: 680, h: 380, top: 40,   left: -15, dur: 38, delay: -22, hue: 220, sat: 68, lit: 74, a: 0.07, rotate: 18 },
-  ];
-
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {blobs.map((b, i) => (
-        <motion.div
-          key={i}
-          animate={{
-            x: [
-              (mx - 0.5) * -24,
-              (mx - 0.5) * -24 + 8,
-              (mx - 0.5) * -24 - 8,
-              (mx - 0.5) * -24,
-            ],
-            y: [
-              (my - 0.5) * -18,
-              (my - 0.5) * -18 - 10,
-              (my - 0.5) * -18 + 10,
-              (my - 0.5) * -18,
-            ],
-            rotate: [b.rotate, b.rotate + 8, b.rotate - 6, b.rotate],
-            scale:  [1, 1.05, 0.97, 1],
-          }}
-          transition={{
-            duration: b.dur,
-            delay: b.delay,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-          style={{
-            position: 'absolute',
-            top:    `${b.top}%`,
-            left:   `${b.left}%`,
-            width:  b.w,
-            height: b.h,
-            borderRadius: '50%',
-            background: `radial-gradient(ellipse, hsla(${b.hue},${b.sat}%,${b.lit}%,${b.a}) 0%, transparent 70%)`,
-            filter: 'blur(72px)',
-            willChange: 'transform',
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LAYER 4 — ANIMATED SVG CURVES
-   Elegant flowing bezier paths that morph continuously.
-   Low opacity, travel behind text, never intersect copy.
-   ══════════════════════════════════════════════════════════════ */
-function SVGCurvesLayer() {
-  const [t, setT] = useState(0);
-
-  useEffect(() => {
-    let frame: number;
-    const tick = () => {
-      setT(prev => prev + 0.003);
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, []);
-
-  const sin = (a: number, amp: number, off = 0) => Math.sin(t * a + off) * amp;
-
-  const curves = [
-    {
-      d: `M -100 ${300 + sin(0.7, 60)} C ${200 + sin(0.5, 80)} ${150 + sin(0.6, 50)}, ${600 + sin(0.4, 60)} ${400 + sin(0.8, 40)}, 1700 ${250 + sin(0.3, 80)}`,
-      stroke: 'rgba(59,118,240,0.08)', sw: 1.5,
-    },
-    {
-      d: `M -100 ${500 + sin(0.6, 50, 1)} C ${300 + sin(0.4, 70, 0.5)} ${200 + sin(0.7, 60, 1.2)}, ${700 + sin(0.5, 50, 2)} ${600 + sin(0.3, 70, 0.8)}, 1700 ${400 + sin(0.4, 60, 1.5)}`,
-      stroke: 'rgba(100,140,255,0.06)', sw: 2,
-    },
-    {
-      d: `M -100 ${200 + sin(0.8, 40, 2)} C ${400 + sin(0.3, 90, 1)} ${350 + sin(0.5, 50, 0.5)}, ${800 + sin(0.6, 60, 1.5)} ${180 + sin(0.7, 60, 2)}, 1700 ${550 + sin(0.2, 80, 1)}`,
-      stroke: 'rgba(180,200,255,0.05)', sw: 1,
-    },
-    {
-      d: `M -100 ${700 + sin(0.5, 70, 3)} C ${250 + sin(0.7, 60, 0.7)} ${450 + sin(0.4, 80, 1.8)}, ${650 + sin(0.3, 70, 2.5)} ${680 + sin(0.6, 50, 0.3)}, 1700 ${600 + sin(0.5, 60, 2.2)}`,
-      stroke: 'rgba(59,118,240,0.05)', sw: 1.5,
-    },
-  ];
-
-  return (
-    <svg
-      className="absolute inset-0 w-full h-full pointer-events-none"
-      viewBox="0 0 1600 900"
-      preserveAspectRatio="xMidYMid slice"
-    >
-      {curves.map((c, i) => (
-        <path
-          key={i}
-          d={c.d}
-          fill="none"
-          stroke={c.stroke}
-          strokeWidth={c.sw}
-          strokeLinecap="round"
-        />
-      ))}
-    </svg>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LAYER 5 — LUXURY LIGHT SWEEP
-   Polished-glass reflection travelling left→right every 7s.
-   ══════════════════════════════════════════════════════════════ */
-function LightSweepLayer() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute inset-0 light-sweep" />
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LAYER 6 — ANIMATED GRID
-   Very thin lines at 3% opacity drifting diagonally.
-   Pure CSS — zero JS cost.
-   ══════════════════════════════════════════════════════════════ */
-function GridLayer({ mx, my }: { mx: number; my: number }) {
-  return (
-    <motion.div
-      className="absolute inset-0 pointer-events-none"
-      animate={{ x: (mx - 0.5) * -8, y: (my - 0.5) * -6 }}
-      transition={{ type: 'spring', stiffness: 30, damping: 20 }}
-      style={{
-        backgroundImage: `
-          linear-gradient(rgba(59,118,240,0.03) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(59,118,240,0.03) 1px, transparent 1px)
-        `,
-        backgroundSize: '64px 64px',
-        willChange: 'transform',
-      }}
-    >
-      {/* Diagonal drift via CSS animation applied by global keyframe */}
-      <div className="absolute inset-[-10%] grid-drift" />
-    </motion.div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LAYER 7 — NOISE TEXTURE
-   Barely-visible film grain adds tactile depth.
-   SVG feTurbulence — GPU-composited, zero layout cost.
-   ══════════════════════════════════════════════════════════════ */
-function NoiseLayer() {
-  return (
-    <div
-      className="absolute inset-0 pointer-events-none opacity-[0.025]"
-      style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.90' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")`,
-        backgroundRepeat: 'repeat',
-        backgroundSize: '180px 180px',
-      }}
-    />
-  );
-}
+import HeroScene from '@/components/hero/HeroScene';
 
 /* ═══════════════════════════════════════════════════════════════
    TITLE REVEAL — Cinematic word-by-word clip animation
@@ -514,40 +136,10 @@ function Hero() {
         className="absolute inset-0"
         style={{ scale: bgScale, willChange: 'transform' }}
       >
-        {/* Base warm white */}
-        <div className="absolute inset-0 bg-[hsl(40,20%,97%)]" />
-
-        {/* L7 — Noise (bottom-most, blends with bg) */}
-        <NoiseLayer />
-
-        {/* L6 — Grid */}
-        <GridLayer mx={mp.x} my={mp.y} />
-
-        {/* L3 — Glass blobs */}
-        <GlassBlobLayer mx={mp.x} my={mp.y} />
-
-        {/* L1 — Aurora (main atmosphere) */}
-        <AuroraLayer mx={mp.x} my={mp.y} />
-
-        {/* L4 — SVG curves */}
-        <SVGCurvesLayer />
-
-        {/* L2 — Flow field particles */}
-        <FlowFieldLayer mx={mp.x} my={mp.y} scrollZ={sz} />
-
-        {/* L5 — Light sweep */}
-        <LightSweepLayer />
-
-        {/* Radial vignette — keeps text area readable */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse 75% 65% at 50% 50%, transparent 20%, hsla(40,20%,97%,0.55) 60%, hsl(40,20%,97%) 100%)',
-          }}
-        />
-
-        {/* Bottom gradient into page */}
-        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-[hsl(40,20%,97%)] to-transparent pointer-events-none" />
+        <HeroScene />
+        
+        {/* Bottom gradient into page to blend 3D canvas smoothly into next section */}
+        <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-[hsl(40,20%,97%)] to-transparent pointer-events-none z-10" />
       </motion.div>
 
       {/* ── FOREGROUND — Title + CTA ── */}
@@ -576,10 +168,10 @@ function Hero() {
             {/* Line 2 — muted, clip reveal */}
             <span className="block overflow-hidden mt-1">
               <motion.span
-                className="block text-muted-foreground font-normal"
+                className="block text-muted-foreground font-normal text-shimmer"
                 initial={{ y: '110%', opacity: 0 }}
                 animate={{ y: '0%',   opacity: 1 }}
-                transition={{ duration: 0.9, delay: 0.72, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.9, delay: 1.0, ease: [0.16, 1, 0.3, 1] }}
               >
                 AI Vehicle Detection
               </motion.span>
@@ -591,7 +183,7 @@ function Hero() {
         <motion.div
           initial={{ scaleX: 0, opacity: 0 }}
           animate={{ scaleX: 1, opacity: 1 }}
-          transition={{ duration: 1.1, delay: 1.05, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 1.1, delay: 1.4, ease: [0.16, 1, 0.3, 1] }}
           className="mt-9 w-20 h-px origin-center"
           style={{ background: 'linear-gradient(90deg, transparent, rgba(59,118,240,0.5), transparent)' }}
         />
@@ -600,7 +192,7 @@ function Hero() {
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0  }}
-          transition={{ duration: 0.85, delay: 1.15, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.85, delay: 1.6, ease: [0.16, 1, 0.3, 1] }}
           className="mt-8 text-body-xl text-muted-foreground max-w-2xl text-balance"
         >
           Industrial Computer Vision Platform for real-time Truck &amp; Wagon
@@ -611,7 +203,7 @@ function Hero() {
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0  }}
-          transition={{ duration: 0.75, delay: 1.35, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.75, delay: 1.8, ease: [0.16, 1, 0.3, 1] }}
           className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-3"
         >
           {/* Primary — has tilt + glow */}

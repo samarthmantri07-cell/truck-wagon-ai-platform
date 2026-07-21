@@ -1,6 +1,7 @@
 import '@/styles/globals.css';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import type { Metadata } from 'next';
+import QueryProvider from '@/providers/QueryProvider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -43,7 +44,9 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased bg-background text-foreground`}
       >
-        {children}
+        <QueryProvider>
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

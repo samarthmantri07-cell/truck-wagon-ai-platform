@@ -10,15 +10,18 @@ import {
   Bell, ChevronLeft, Menu, AlertTriangle,
   Cpu,
 } from 'lucide-react';
-import { MOCK_EMPLOYEE, MOCK_ALERTS } from '@/constants/mockData';
+import { MOCK_ALERTS } from '@/constants/mockData';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Console',    icon: LayoutDashboard, href: '/dashboard' },
   { label: 'Live Feed',  icon: Video,            href: '/live' },
+  { label: 'Detection',  icon: Camera,           href: '/detection' },
   { label: 'Analytics',  icon: BarChart3,        href: '/analytics' },
   { label: 'History',    icon: Clock,            href: '/history' },
   { label: 'Reports',    icon: FileText,         href: '/reports' },
-  { label: 'Cameras',    icon: Camera,           href: '/cameras' },
   { label: 'Settings',   icon: Settings,         href: '/settings' },
   { label: 'Profile',    icon: User,             href: '/profile' },
 ];
@@ -27,10 +30,25 @@ interface Props { children: React.ReactNode; title?: string }
 
 export default function DashboardLayout({ children, title }: Props) {
   const pathname  = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const { user, token, logout } = useAuthStore();
+
+  useEffect(() => {
+    if (!token) {
+      router.push('/login');
+    }
+  }, [token, router]);
 
   const activeAlerts = MOCK_ALERTS.filter(a => a.severity === 'error' || a.severity === 'warning').length;
+
+  if (!user) return null; // Or a loading spinner
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -103,7 +121,7 @@ export default function DashboardLayout({ children, title }: Props) {
         <div className="border-t border-border p-3 flex-shrink-0">
           <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
             <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold flex-shrink-0">
-              {MOCK_EMPLOYEE.avatarInitials}
+              {user.username.charAt(0).toUpperCase()}
             </div>
             <AnimatePresence>
               {!collapsed && (
@@ -113,8 +131,8 @@ export default function DashboardLayout({ children, title }: Props) {
                   exit={{ opacity: 0 }}
                   className="min-w-0"
                 >
-                  <div className="text-xs font-semibold text-foreground truncate">{MOCK_EMPLOYEE.name}</div>
-                  <div className="text-[10px] text-muted-foreground truncate">{MOCK_EMPLOYEE.designation}</div>
+                  <div className="text-xs font-semibold text-foreground truncate">{user.username}</div>
+                  <div className="text-[10px] text-muted-foreground truncate capitalize">{user.role}</div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -147,7 +165,7 @@ export default function DashboardLayout({ children, title }: Props) {
             {/* Live status */}
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-xs text-muted-foreground">
               <span className="live-dot" />
-              System Live · {MOCK_EMPLOYEE.gate}
+              System Live · {user.username}
             </div>
 
             {/* Notifications */}
@@ -195,9 +213,17 @@ export default function DashboardLayout({ children, title }: Props) {
               </AnimatePresence>
             </div>
 
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold flex-shrink-0">
-              {MOCK_EMPLOYEE.avatarInitials}
+            {/* Avatar & Logout */}
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold flex-shrink-0">
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-xs text-muted-foreground hover:text-foreground hover:bg-muted px-2 py-1.5 rounded-lg transition-colors"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </header>
