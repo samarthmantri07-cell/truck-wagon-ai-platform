@@ -3,6 +3,7 @@ import os
 import cv2
 import numpy as np
 from ultralytics import YOLO
+import torch
 from .config import settings, logger
 from .predict import model, is_model_loaded
 
@@ -42,6 +43,7 @@ def process_video(file_path: str):
     frame_count = 0
     
     start_total = time.time()
+    device = 0 if torch.cuda.is_available() else "cpu"
     
     while True:
         ret, frame = cap.read()
@@ -49,7 +51,7 @@ def process_video(file_path: str):
             break
             
         frame_start = time.time()
-        results = model.predict(frame, verbose=False)
+        results = model.predict(frame, device=device, verbose=False)
         frame_end = time.time()
         
         total_processing_time += (frame_end - frame_start)

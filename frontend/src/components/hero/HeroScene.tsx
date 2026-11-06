@@ -15,7 +15,10 @@ function AuroraLayer() {
   
   const uniforms = useMemo(() => ({
     uTime: { value: 0 },
-    uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+    uResolution: { value: new THREE.Vector2(
+      typeof window !== 'undefined' ? window.innerWidth : 1920,
+      typeof window !== 'undefined' ? window.innerHeight : 1080
+    ) }
   }), []);
 
   useFrame((state) => {

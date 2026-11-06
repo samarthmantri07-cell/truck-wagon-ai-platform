@@ -56,7 +56,7 @@ export interface StreamDetectionResult {
   success: boolean;
   processing_time_ms: number;
   detections: Array<{
-    class: string;
+    class_name: string;
     confidence: number;
     bbox: { x1: number; y1: number; x2: number; y2: number };
   }>;

@@ -14,7 +14,16 @@ def load_model():
         logger.info(f"Loading model from {settings.MODEL_PATH}...")
         try:
             model = YOLO(settings.MODEL_PATH)
-            logger.info("Model loaded successfully.")
+            device = 0 if torch.cuda.is_available() else "cpu"
+            if torch.cuda.is_available():
+                model.to('cuda')
+                logger.info(f"Model loaded on GPU: {torch.cuda.get_device_name(0)}")
+            else:
+                logger.info("Model loaded on CPU.")
+            # Warm up model and CUDA kernels
+            dummy = np.zeros((640, 640, 3), dtype=np.uint8)
+            model.predict(dummy, device=device, verbose=False)
+            logger.info("Model warmup complete.")
         except Exception as e:
             logger.error(f"Failed to load model: {e}")
             raise e
@@ -38,8 +47,9 @@ def run_inference(image: np.ndarray):
     if model is None:
         raise RuntimeError("Model is not loaded.")
     
+    device = 0 if torch.cuda.is_available() else "cpu"
     start_time = time.time()
-    results = model.predict(image, verbose=False)
+    results = model.predict(image, device=device, verbose=False)
     end_time = time.time()
     
     processing_time_ms = int((end_time - start_time) * 1000)

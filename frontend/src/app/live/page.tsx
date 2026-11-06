@@ -96,7 +96,7 @@ export default function Live() {
         if (result.success && result.detections.length > 0) {
           const newEvents = result.detections.map((d, i) => ({
             id: `EVT-${Date.now().toString().slice(-4)}-${i}`,
-            type: d.class,
+            type: d.class_name || 'unknown',
             confidence: d.confidence,
             time: new Date()
           }));
@@ -181,7 +181,8 @@ export default function Live() {
                   const width = ((det.bbox.x2 - det.bbox.x1) / vw) * 100;
                   const height = ((det.bbox.y2 - det.bbox.y1) / vh) * 100;
                   
-                  const color = det.class.includes('loaded') ? '#10b981' : '#f59e0b';
+                  const safeClassName = det.class_name || '';
+                  const color = safeClassName.includes('loaded') ? '#10b981' : '#f59e0b';
                   
                   return (
                     <motion.div
@@ -202,7 +203,7 @@ export default function Live() {
                         className="absolute -top-6 left-[-2px] px-2 py-0.5 text-[10px] font-mono font-bold text-black uppercase whitespace-nowrap"
                         style={{ backgroundColor: color }}
                       >
-                        {det.class.replace('_', ' ')} {(det.confidence * 100).toFixed(0)}%
+                        {safeClassName.replace(/_/g, ' ')} {(det.confidence * 100).toFixed(0)}%
                       </div>
                     </motion.div>
                   )
@@ -343,8 +344,8 @@ export default function Live() {
                 className="divide-y divide-border"
               >
                 {[
-                  { label: 'Type',        value: latestVehicle.class.replace('_', ' ').toUpperCase() },
-                  { label: 'State',       value: latestVehicle.class.includes('loaded') ? 'LOADED' : 'EMPTY' },
+                  { label: 'Type',        value: (latestVehicle.class_name || 'unknown').replace(/_/g, ' ').toUpperCase() },
+                  { label: 'State',       value: (latestVehicle.class_name || '').includes('loaded') ? 'LOADED' : 'EMPTY' },
                   { label: 'Confidence', value: `${(latestVehicle.confidence * 100).toFixed(1)}%` },
                   { label: 'Camera',     value: source === 'laptop' ? 'CAM_LPT_01' : 'CAM_RTSP_01' },
                   { label: 'Processing',  value: `${detections?.processing_time_ms} ms` },

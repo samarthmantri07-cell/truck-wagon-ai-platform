@@ -8,7 +8,7 @@ class BBox(BaseModel):
     y2: int
 
 class Detection(BaseModel):
-    class_name: str = Field(alias="class")
+    class_name: str
     confidence: float
     bbox: BBox
 

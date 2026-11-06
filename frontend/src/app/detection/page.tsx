@@ -154,14 +154,14 @@ export default function Detection() {
                           top: `${det.bbox.y1}%`,
                           width: `${det.bbox.x2 - det.bbox.x1}%`,
                           height: `${det.bbox.y2 - det.bbox.y1}%`,
-                          borderColor: det.class.includes('loaded') ? '#10b981' : '#f59e0b',
+                          borderColor: det.class_name.includes('loaded') ? '#10b981' : '#f59e0b',
                         }}
                       >
                         <div 
                           className="absolute -top-6 left-[-2px] px-2 py-0.5 text-[10px] font-mono font-bold text-black uppercase whitespace-nowrap"
-                          style={{ backgroundColor: det.class.includes('loaded') ? '#10b981' : '#f59e0b' }}
+                          style={{ backgroundColor: det.class_name.includes('loaded') ? '#10b981' : '#f59e0b' }}
                         >
-                          {det.class.replace('_', ' ')} {(det.confidence * 100).toFixed(0)}%
+                          {det.class_name.replace(/_/g, ' ')} {(det.confidence * 100).toFixed(0)}%
                         </div>
                       </motion.div>
                     ))}
@@ -259,10 +259,10 @@ export default function Detection() {
                           <div className="flex items-center gap-3">
                             <div className={cn(
                               "w-2 h-2 rounded-full",
-                              det.class.includes('loaded') ? 'bg-success' : 'bg-warning'
+                              det.class_name.includes('loaded') ? 'bg-success' : 'bg-warning'
                             )} />
                             <div>
-                              <div className="text-xs font-semibold capitalize">{det.class.replace('_', ' ')}</div>
+                              <div className="text-xs font-semibold capitalize">{det.class_name.replace(/_/g, ' ')}</div>
                               <div className="text-[10px] text-muted-foreground">Detection #{idx + 1}</div>
                             </div>
                           </div>

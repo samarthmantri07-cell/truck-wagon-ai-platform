@@ -16,12 +16,12 @@ class DetectionRepository {
         success,
         objects: {
           create: objects.map(obj => ({
-            className: obj.class,
+            className: obj.class_name || obj.class || 'unknown',
             confidence: obj.confidence,
-            x1: obj.bbox.x1,
-            y1: obj.bbox.y1,
-            x2: obj.bbox.x2,
-            y2: obj.bbox.y2
+            x1: (obj.bbox && obj.bbox.x1) || 0,
+            y1: (obj.bbox && obj.bbox.y1) || 0,
+            x2: (obj.bbox && obj.bbox.x2) || 0,
+            y2: (obj.bbox && obj.bbox.y2) || 0
           }))
         }
       },
